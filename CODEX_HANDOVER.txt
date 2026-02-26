@@ -1,0 +1,251 @@
+# CODEX IMPLEMENTATION PLAN — Rahman's Command Centre
+# =====================================================
+# Paste this entire document into a fresh Codex chat to continue.
+#
+# Project: A personalized web app for my friend Rahman with calendar,
+# to-do list, and mood tracking — with voice commands powered by OpenAI.
+
+# =====================================================
+# CONTEXT — WHAT EXISTS ALREADY
+# =====================================================
+
+The project lives at: rahmans-app/ inside my repo.
+
+The following files are ALREADY BUILT and working:
+
+## Frontend (COMPLETE):
+- index.html — Single-file web app (~1400 lines) with HTML/CSS/JS
+  - 3-tab layout: Calendar, To Do List, Mood
+  - Cool blue-purple dark theme
+  - Personalized for "Rahman" (his name everywhere, rotating photo banners,
+    time-based greetings like "Good morning, king", welcome splash screen)
+  - Calendar: monthly grid, click dates, add/view/delete events
+  - To Do: priority-colored tasks, check-off, completed section
+  - Mood: two buttons with Rahman's photos ("ASS" = sad, "FIRE" = happy),
+    text-to-speech, confetti animation, mood history + stats
+  - Voice commands: records audio via MediaRecorder, sends base64 to backend
+  - All data stored in localStorage (events, todos, moods)
+  - Manual add forms as fallback for calendar events and tasks
+- manifest.json — PWA configuration
+- images/ — 8 photos of Rahman (mood_fire.jpg, mood_ass.jpg, bg_*.jpg)
+
+## Backend (COMPLETE but NOT DEPLOYED):
+- backend/server.js — Express.js server that:
+  - POST /api/voice/process — receives { audio: base64, context: "calendar"|"todo" }
+  - Calls OpenAI Whisper API (whisper-1) to transcribe audio
+  - Calls OpenAI GPT-4.1-mini to parse transcript into structured JSON
+  - Returns { transcript, parsed, context }
+  - GET /health — health check
+  - Uses cors middleware (allows all origins)
+- backend/package.json — Dependencies: express, cors, axios, form-data, dotenv
+- backend/Dockerfile — Ready for Cloud Run deployment
+- backend/.dockerignore
+- backend/.env.example
+
+## OpenAI API Key:
+<YOUR_OPENAI_API_KEY>
+
+## Google Cloud Project:
+- Project name: arjieos-sheets
+- Project ID: arjieos-sheets
+- Project number: 708175752584
+- gcloud CLI is NOT currently installed on the user's Mac
+
+# =====================================================
+# WHAT NEEDS TO BE DONE — REMAINING TASKS
+# =====================================================
+
+## TASK 1: Deploy the backend to Google Cloud Run
+
+The backend at backend/ needs to be deployed to Google Cloud Run so
+the frontend can call it for voice processing.
+
+Steps:
+1. Install gcloud CLI on the user's Mac if not already installed:
+   brew install google-cloud-sdk
+
+2. Authenticate and set project:
+   gcloud auth login
+   gcloud config set project arjieos-sheets
+
+3. Enable required APIs (may need to be done first):
+   gcloud services enable run.googleapis.com
+   gcloud services enable cloudbuild.googleapis.com
+   gcloud services enable artifactregistry.googleapis.com
+
+4. Navigate to the backend directory:
+   cd ~/Downloads/Projects/argieos-v2/rahmans-app/backend
+
+5. Deploy to Cloud Run:
+   gcloud run deploy rahmans-backend \
+     --source . \
+     --region us-central1 \
+     --allow-unauthenticated \
+     --set-env-vars "OPENAI_API_KEY=<YOUR_OPENAI_API_KEY>"
+
+6. Note the Service URL from the output (e.g. https://rahmans-backend-xxxxx.run.app)
+
+7. Test it:
+   curl https://rahmans-backend-xxxxx.run.app/health
+   Should return: {"status":"ok","message":"Rahman's backend is running! 👑"}
+
+
+## TASK 2: Update frontend with the backend URL
+
+Once the backend is deployed and you have the URL:
+
+In index.html, there are TWO lines that reference the backend URL.
+Both say: const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://your-backend-url.com';
+
+These are on approximately lines 1238 and 1321.
+
+Replace 'https://your-backend-url.com' with the actual Cloud Run URL
+from Task 1 in BOTH places.
+
+Example:
+  BEFORE: const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://your-backend-url.com';
+  AFTER:  const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://rahmans-backend-abc123.run.app';
+
+
+## TASK 3: Deploy the frontend
+
+The frontend (index.html + images/ + manifest.json) needs to be hosted
+somewhere publicly accessible. Options:
+
+Option A — Vercel (recommended, easiest):
+  cd ~/Downloads/Projects/argieos-v2/rahmans-app
+  npx vercel
+
+Option B — Netlify:
+  Drag and drop the rahmans-app folder at netlify.com
+
+Option C — GitHub Pages:
+  Push to a GitHub repo, enable Pages in settings
+
+Option D — Firebase Hosting:
+  firebase init hosting
+  firebase deploy
+
+The frontend is entirely static (HTML + images), no build step needed.
+
+
+## TASK 4: Test end-to-end
+
+1. Open the deployed frontend URL on a phone (or desktop browser)
+2. Click the voice button on Calendar or To Do tab
+3. Grant microphone permission
+4. Speak a command like "Add meeting tomorrow at 3pm"
+5. Verify: audio records, sends to backend, backend transcribes + parses,
+   frontend adds the event/task
+6. Test the Mood tab (ASS/FIRE buttons should speak + animate + confetti)
+7. Test manual add forms as fallback
+8. Verify localStorage persistence (refresh page, data should persist)
+
+
+## TASK 5 (OPTIONAL): Clean up dead code in frontend
+
+The frontend still has some leftover code from the initial approach
+(before we added the backend). These can be cleaned up:
+
+1. Remove the API key modal HTML (id="apiKeyModal") — no longer needed
+2. Remove the saveApiKey() function — no longer needed
+3. Remove the BAKED_API_KEY constant — no longer needed since backend holds it
+4. Remove the apiKey references in STORAGE_KEYS — no longer needed
+5. Remove the transcribeWithWebSpeech() function — no longer needed
+   (was an intermediate approach, never used since we went with backend)
+6. Remove the decodeAudioAndTranscribe() function — no longer needed
+   (processVoice now calls the backend directly)
+
+These are cosmetic cleanups. The app works fine without doing them.
+
+
+# =====================================================
+# KEY ARCHITECTURE
+# =====================================================
+
+Frontend (index.html, hosted on Vercel/Netlify/etc)
+  |
+  | User clicks voice button → records audio via MediaRecorder
+  | Converts audio blob to base64
+  | POST to backend /api/voice/process with { audio, context }
+  |
+  v
+Backend (server.js, hosted on Google Cloud Run)
+  |
+  | 1. Receives base64 audio
+  | 2. Calls OpenAI Whisper API (whisper-1) → gets transcript text
+  | 3. Calls OpenAI GPT-4.1-mini → parses text into structured JSON
+  |    - Calendar: { events: [{ title, date, time }] }
+  |    - Todo: { tasks: [{ title, priority, notes }] }
+  | 4. Returns { transcript, parsed, context }
+  |
+  v
+Frontend receives response
+  |
+  | Adds events/tasks to localStorage
+  | Re-renders the UI
+  | Shows success message
+
+
+Data storage:
+- Calendar events → localStorage key: rahman_events
+- Todo tasks → localStorage key: rahman_todos
+- Mood logs → localStorage key: rahman_moods
+- All local to Rahman's browser, no cloud database
+
+
+# =====================================================
+# IMPORTANT CONSTRAINTS
+# =====================================================
+
+1. The backend MUST use model 'gpt-4.1-mini' — not any other model
+2. The backend MUST use 'whisper-1' for transcription
+3. The frontend must NOT call OpenAI directly (CORS blocks it)
+4. All frontend data is localStorage only (no database, no accounts)
+5. The app is personalized for "Rahman" — keep his name, photos, greetings
+6. The mood tab says "ASS" and "FIRE" — this is intentional, keep it
+7. Photos in images/ are real photos of Rahman — don't modify or remove them
+8. The OpenAI API key above is the real key — use it for the backend env var
+
+
+# =====================================================
+# FILE REFERENCE
+# =====================================================
+
+rahmans-app/
+├── index.html                  ← Frontend app (single file, ~1400 lines)
+├── manifest.json               ← PWA config
+├── images/
+│   ├── mood_fire.jpg           ← Happy Rahman (for FIRE button)
+│   ├── mood_ass.jpg            ← Pensive Rahman (for ASS button)
+│   ├── bg_mango.jpg            ← Background photo
+│   ├── bg_formal.jpg           ← Background photo
+│   ├── bg_dinner.jpg           ← Background photo
+│   ├── bg_party.jpg            ← Background photo
+│   ├── bg_friends1.jpg         ← Background photo
+│   └── bg_friends2.jpg         ← Background photo
+├── backend/
+│   ├── server.js               ← Express backend (186 lines)
+│   ├── package.json            ← Node.js dependencies
+│   ├── Dockerfile              ← Cloud Run deployment
+│   ├── .dockerignore
+│   └── .env.example            ← Template for env vars
+├── README.md
+├── DEPLOYMENT.md
+├── BACKEND_SETUP_QUICKSTART.md
+└── START_HERE.md
+
+
+# =====================================================
+# SUMMARY — WHAT TO DO
+# =====================================================
+
+1. Help me install gcloud CLI and deploy backend/server.js to Google Cloud Run
+   on project arjieos-sheets using the Dockerfile and env var for the API key
+2. Once deployed, update index.html with the backend URL (two places, ~lines 1238 and 1321)
+3. Help me deploy the frontend (index.html + images/ + manifest.json) to Vercel or Netlify
+4. Test that voice commands work end-to-end
+5. Optionally clean up dead code from the frontend
+
+The code is all written. Nothing needs to be created from scratch.
+This is purely a deployment task.

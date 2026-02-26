@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0e1a">
+<title>Rahman's Command Centre</title>
+<link rel="manifest" href="manifest.json">
+<style>
+/* ═══════════════════════════════════════════
+   CSS VARIABLES & RESET
+   ═══════════════════════════════════════════ */
+:root {
+  --bg-deep: #0a0e1a;
+  --bg-card: #141829;
+  --bg-card-elevated: #1c2137;
+  --bg-hover: #232847;
+  --accent-blue: #4f8cff;
+  --accent-purple: #9b6dff;
+  --accent-cyan: #00d4ff;
+  --accent-pink: #ff4f9a;
+  --accent-green: #00e88f;
+  --accent-orange: #ff8c42;
+  --accent-red: #ff4757;
+  --text-primary: #eef0ff;
+  --text-secondary: #8b90b0;
+  --text-muted: #555a7a;
+  --gradient-main: linear-gradient(135deg, #4f8cff 0%, #9b6dff 50%, #ff4f9a 100%);
+  --gradient-card: linear-gradient(145deg, #1c2137 0%, #141829 100%);
+  --glow-blue: 0 0 20px rgba(79,140,255,0.3);
+  --glow-purple: 0 0 20px rgba(155,109,255,0.3);
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-xs: 6px;
+  --tab-height: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ═══════════════════════════════════════════
+   SPLASH SCREEN
+   ═══════════════════════════════════════════ */
+#splash {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: var(--bg-deep);
+  opacity: 1;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+#splash.fade-out {
+  opacity: 0;
+  transform: scale(1.05);
+  pointer-events: none;
+}
+#splash .crown { font-size: 48px; margin-bottom: 16px; animation: crownBounce 0.8s ease; }
+@keyframes crownBounce {
+  0% { transform: scale(0) rotate(-20deg); }
+  60% { transform: scale(1.2) rotate(5deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+#splash h1 {
+  font-size: 22px; font-weight: 800;
+  background: var(--gradient-main);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: textReveal 0.8s ease 0.2s both;
+}
+#splash .subtitle {
+  font-size: 13px; color: var(--text-secondary);
+  margin-top: 8px; opacity: 0;
+  animation: fadeUp 0.6s ease 0.5s forwards;
+}
+@keyframes textReveal {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════
+   APP LAYOUT
+   ═══════════════════════════════════════════ */
+#app {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#app.visible { opacity: 1; }
+
+.tab-content {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px calc(var(--tab-height) + var(--safe-bottom) + 16px);
+}
+.tab-content.hidden { display: none; }
+
+/* ═══════════════════════════════════════════
+   TAB BAR
+   ═══════════════════════════════════════════ */
+#tabBar {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: calc(var(--tab-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(20, 24, 41, 0.92);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(79,140,255,0.15);
+  display: flex; align-items: center; justify-content: space-around;
+  z-index: 100;
+}
+.tab-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: none; border: none; color: var(--text-muted);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+  cursor: pointer; padding: 8px 16px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+.tab-btn .tab-icon { font-size: 24px; transition: transform 0.25s ease; }
+.tab-btn.active { color: var(--accent-blue); }
+.tab-btn.active .tab-icon { transform: scale(1.15); }
+.tab-btn.active::after {
+  content: ''; position: absolute; top: -1px;
+  left: 50%; transform: translateX(-50%);
+  width: 32px; height: 3px;
+  background: var(--gradient-main);
+  border-radius: 0 0 3px 3px;
+}
+
+/* ═══════════════════════════════════════════
+   SECTION HEADERS
+   ═══════════════════════════════════════════ */
+.section-header {
+  font-size: 20px; font-weight: 800;
+  letter-spacing: -0.3px;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-header .emoji { font-size: 24px; }
+.gradient-text {
+  background: var(--gradient-main);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ═══════════════════════════════════════════
+   GLASS CARD
+   ═══════════════════════════════════════════ */
+.glass-card {
+  background: var(--gradient-card);
+  border: 1px solid rgba(79,140,255,0.12);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.glass-card:hover { transform: translateY(-1px); box-shadow: var(--glow-blue); }
+
+/* ═══════════════════════════════════════════
+   PHOTO BANNER (rotating personalization)
+   ═══════════════════════════════════════════ */
+.photo-banner {
+  width: 100%; height: 160px;
+  border-radius: var(--radius);
+  overflow: hidden; position: relative;
+  margin-bottom: 16px;
+}
+.photo-banner img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  filter: brightness(0.55);
+  transition: opacity 1s ease;
+}
+.photo-banner .overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, var(--bg-deep) 0%, transparent 60%);
+}
+.photo-banner .banner-text {
+  position: absolute; bottom: 14px; left: 16px;
+  font-size: 16px; font-weight: 700;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+.photo-banner .banner-text span { font-size: 11px; display: block; color: var(--text-secondary); font-weight: 400; margin-top: 2px; }
+
+/* ═══════════════════════════════════════════
+   CALENDAR STYLES
+   ═══════════════════════════════════════════ */
+.cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.cal-nav button {
+  background: var(--bg-card-elevated); border: 1px solid rgba(79,140,255,0.15);
+  color: var(--text-primary); border-radius: var(--radius-sm);
+  width: 36px; height: 36px; font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.cal-nav button:hover { background: var(--bg-hover); }
+.cal-nav .month-label { font-size: 16px; font-weight: 700; }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  margin-bottom: 16px;
+}
+.cal-day-header {
+  text-align: center; font-size: 11px; font-weight: 600;
+  color: var(--text-muted); padding: 6px 0;
+}
+.cal-day {
+  aspect-ratio: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  border-radius: var(--radius-xs); font-size: 13px; font-weight: 500;
+  cursor: pointer; position: relative;
+  transition: all 0.2s ease; color: var(--text-secondary);
+}
+.cal-day:hover { background: var(--bg-hover); }
+.cal-day.today {
+  background: rgba(79,140,255,0.15);
+  color: var(--accent-blue); font-weight: 700;
+  border: 1px solid rgba(79,140,255,0.3);
+}
+.cal-day.selected {
+  background: var(--accent-blue);
+  color: white; font-weight: 700;
+}
+.cal-day.has-events::after {
+  content: ''; position: absolute; bottom: 4px;
+  width: 5px; height: 5px; background: var(--accent-purple);
+  border-radius: 50%;
+}
+.cal-day.other-month { color: var(--text-muted); opacity: 0.4; }
+
+.event-list { margin-top: 8px; }
+.event-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px; border-radius: var(--radius-sm);
+  background: var(--bg-card-elevated);
+  border-left: 3px solid var(--accent-purple);
+  margin-bottom: 8px;
+  transition: transform 0.15s;
+  position: relative;
+}
+.event-item:active { transform: scale(0.98); }
+.event-item .event-time {
+  font-size: 11px; font-weight: 600; color: var(--accent-cyan);
+  min-width: 50px;
+}
+.event-item .event-title { font-size: 14px; font-weight: 600; flex: 1; }
+.event-item .delete-btn {
+  background: none; border: none; color: var(--accent-red);
+  font-size: 16px; cursor: pointer; padding: 4px 8px;
+  opacity: 0.6; transition: opacity 0.2s;
+}
+.event-item .delete-btn:hover { opacity: 1; }
+
+/* ═══════════════════════════════════════════
+   TODO STYLES
+   ═══════════════════════════════════════════ */
+.todo-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px; border-radius: var(--radius-sm);
+  background: var(--bg-card-elevated);
+  margin-bottom: 8px;
+  transition: all 0.25s ease;
+  border-left: 3px solid var(--accent-blue);
+}
+.todo-item.priority-high { border-left-color: var(--accent-red); }
+.todo-item.priority-medium { border-left-color: var(--accent-orange); }
+.todo-item.priority-low { border-left-color: var(--accent-green); }
+.todo-item.completed {
+  opacity: 0.5;
+  border-left-color: var(--text-muted);
+}
+.todo-item.completed .todo-title { text-decoration: line-through; }
+.todo-check {
+  width: 22px; height: 22px; min-width: 22px;
+  border-radius: 50%; border: 2px solid var(--accent-blue);
+  background: none; cursor: pointer; margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+  font-size: 12px; color: transparent;
+}
+.todo-check:hover { background: rgba(79,140,255,0.15); }
+.todo-item.completed .todo-check {
+  background: var(--accent-green); border-color: var(--accent-green);
+  color: white;
+}
+.todo-item.priority-high .todo-check { border-color: var(--accent-red); }
+.todo-item.priority-medium .todo-check { border-color: var(--accent-orange); }
+.todo-item.priority-low .todo-check { border-color: var(--accent-green); }
+.todo-info { flex: 1; }
+.todo-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.todo-notes { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.todo-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text-muted);
+}
+.priority-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.priority-badge.high { background: rgba(255,71,87,0.15); color: var(--accent-red); }
+.priority-badge.medium { background: rgba(255,140,66,0.15); color: var(--accent-orange); }
+.priority-badge.low { background: rgba(0,232,143,0.15); color: var(--accent-green); }
+.todo-delete-btn {
+  background: none; border: none; color: var(--accent-red);
+  font-size: 14px; cursor: pointer; padding: 4px 8px;
+  opacity: 0.5; transition: opacity 0.2s;
+  align-self: flex-start; margin-top: 2px;
+}
+.todo-delete-btn:hover { opacity: 1; }
+
+.completed-section {
+  margin-top: 16px;
+}
+.completed-toggle {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  padding: 8px 0; display: flex; align-items: center; gap: 6px;
+}
+.completed-toggle .arrow { transition: transform 0.2s; }
+.completed-toggle .arrow.open { transform: rotate(90deg); }
+
+/* ═══════════════════════════════════════════
+   VOICE BUTTON
+   ═══════════════════════════════════════════ */
+.voice-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px;
+  background: var(--gradient-main);
+  border: none; border-radius: var(--radius);
+  color: white; font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 20px rgba(79,140,255,0.3);
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.voice-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(79,140,255,0.4); }
+.voice-btn:active { transform: scale(0.97); }
+.voice-btn.recording {
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-pink));
+  animation: recordPulse 1.5s ease infinite;
+}
+@keyframes recordPulse {
+  0%, 100% { box-shadow: 0 4px 20px rgba(255,71,87,0.3); }
+  50% { box-shadow: 0 4px 30px rgba(255,71,87,0.6); }
+}
+.voice-btn .pulse-ring {
+  position: absolute; inset: -4px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: var(--radius);
+  animation: pulseRing 1.5s ease infinite;
+  display: none;
+}
+.voice-btn.recording .pulse-ring { display: block; }
+@keyframes pulseRing {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+/* Voice status */
+.voice-status {
+  text-align: center; font-size: 12px; color: var(--text-secondary);
+  margin-bottom: 12px; min-height: 18px;
+  transition: all 0.3s;
+}
+.voice-status.processing { color: var(--accent-cyan); }
+.voice-status.error { color: var(--accent-red); }
+.voice-status.success { color: var(--accent-green); }
+
+/* ═══════════════════════════════════════════
+   MOOD TAB
+   ═══════════════════════════════════════════ */
+.mood-container {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 24px;
+  padding-top: 20px;
+}
+.mood-title {
+  font-size: 22px; font-weight: 800;
+  text-align: center;
+}
+.mood-subtitle {
+  font-size: 13px; color: var(--text-secondary);
+  text-align: center; margin-top: -12px;
+}
+.mood-buttons {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 16px; width: 100%;
+}
+.mood-btn {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 16px;
+  background: var(--gradient-card);
+  border: 2px solid rgba(79,140,255,0.12);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative; overflow: hidden;
+}
+.mood-btn:hover { transform: translateY(-4px); }
+.mood-btn:active { transform: scale(0.95); }
+.mood-btn.ass-btn:hover { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(255,71,87,0.3); }
+.mood-btn.fire-btn:hover { border-color: var(--accent-green); box-shadow: 0 0 30px rgba(0,232,143,0.3); }
+
+.mood-btn img {
+  width: 100%; aspect-ratio: 3/4;
+  object-fit: cover; border-radius: var(--radius-sm);
+}
+.mood-label {
+  font-size: 20px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 2px;
+}
+.ass-btn .mood-label { color: var(--accent-red); }
+.fire-btn .mood-label { color: var(--accent-green); }
+
+/* Mood animation overlay */
+.mood-flash {
+  position: fixed; inset: 0; z-index: 200;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.15s;
+}
+.mood-flash.active { opacity: 1; }
+.mood-flash .big-emoji {
+  font-size: 120px;
+  animation: moodPop 0.6s ease;
+}
+@keyframes moodPop {
+  0% { transform: scale(0) rotate(-30deg); }
+  50% { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.mood-flash .big-text {
+  font-size: 48px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 4px;
+  margin-top: 16px;
+  animation: textSlam 0.5s ease 0.1s both;
+}
+@keyframes textSlam {
+  0% { transform: scale(3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.mood-flash.ass-flash { background: rgba(255,71,87,0.15); }
+.mood-flash.ass-flash .big-text { color: var(--accent-red); }
+.mood-flash.fire-flash { background: rgba(0,232,143,0.15); }
+.mood-flash.fire-flash .big-text { color: var(--accent-green); }
+
+/* Mood history */
+.mood-history {
+  width: 100%; margin-top: 8px;
+}
+.mood-history-title {
+  font-size: 14px; font-weight: 700; color: var(--text-secondary);
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.mood-history-list {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.mood-pip {
+  font-size: 18px;
+  animation: pipPop 0.3s ease;
+}
+@keyframes pipPop {
+  0% { transform: scale(0); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* Confetti */
+.confetti-piece {
+  position: fixed; z-index: 250;
+  width: 10px; height: 10px;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════
+   FORM INPUTS (for manual add)
+   ═══════════════════════════════════════════ */
+.add-form {
+  display: none; flex-direction: column; gap: 10px;
+  padding: 14px; border-radius: var(--radius);
+  background: var(--bg-card-elevated);
+  border: 1px solid rgba(79,140,255,0.15);
+  margin-bottom: 12px;
+}
+.add-form.open { display: flex; }
+.form-row { display: flex; gap: 8px; }
+.form-input {
+  flex: 1; padding: 10px 14px;
+  background: var(--bg-card); border: 1px solid rgba(79,140,255,0.15);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  font-size: 14px; outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--accent-blue); }
+.form-input::placeholder { color: var(--text-muted); }
+.form-select {
+  padding: 10px 14px;
+  background: var(--bg-card); border: 1px solid rgba(79,140,255,0.15);
+  border-radius: var(--radius-sm); color: var(--text-primary);
+  font-size: 14px; outline: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.form-btn {
+  padding: 10px 20px;
+  background: var(--accent-blue); border: none;
+  border-radius: var(--radius-sm); color: white;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  transition: background 0.2s;
+}
+.form-btn:hover { background: var(--accent-purple); }
+.form-btn.cancel { background: var(--bg-hover); color: var(--text-secondary); }
+.manual-add-toggle {
+  background: none; border: 1px dashed rgba(79,140,255,0.3);
+  border-radius: var(--radius-sm); color: var(--text-muted);
+  padding: 10px; font-size: 13px; cursor: pointer;
+  width: 100%; text-align: center; margin-bottom: 12px;
+  transition: all 0.2s;
+}
+.manual-add-toggle:hover { border-color: var(--accent-blue); color: var(--text-secondary); }
+
+/* ═══════════════════════════════════════════
+   EMPTY STATES
+   ═══════════════════════════════════════════ */
+.empty-state {
+  text-align: center; padding: 40px 20px;
+  color: var(--text-muted);
+}
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; line-height: 1.5; }
+
+/* ═══════════════════════════════════════════
+   API KEY MODAL
+   ═══════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal-box {
+  background: var(--bg-card); border: 1px solid rgba(79,140,255,0.2);
+  border-radius: var(--radius); padding: 24px;
+  max-width: 400px; width: 100%;
+}
+.modal-box h2 {
+  font-size: 18px; font-weight: 700; margin-bottom: 8px;
+}
+.modal-box p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+.modal-box .form-input { width: 100%; margin-bottom: 12px; }
+.modal-box .form-btn { width: 100%; }
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════ */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.slide-up { animation: slideUp 0.4s ease both; }
+.slide-up-1 { animation-delay: 0.05s; }
+.slide-up-2 { animation-delay: 0.1s; }
+.slide-up-3 { animation-delay: 0.15s; }
+.slide-up-4 { animation-delay: 0.2s; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ SPLASH SCREEN ═══════ -->
+<div id="splash">
+  <div class="crown">👑</div>
+  <h1>Welcome to Rahman's Command Centre</h1>
+  <div class="subtitle">Built with love, just for you ✨</div>
+</div>
+
+<!-- ═══════ API KEY MODAL ═══════ -->
+<div id="apiKeyModal" class="modal-overlay">
+  <div class="modal-box">
+    <h2>🔑 One-time Setup</h2>
+    <p>Enter your OpenAI API key to enable voice commands. This is stored locally on your device only.</p>
+    <input type="password" id="apiKeyInput" class="form-input" placeholder="sk-...">
+    <button class="form-btn" onclick="saveApiKey()">Save & Continue</button>
+  </div>
+</div>
+
+<!-- ═══════ MOOD FLASH OVERLAY ═══════ -->
+<div id="moodFlash" class="mood-flash">
+  <div class="big-emoji" id="moodFlashEmoji"></div>
+  <div class="big-text" id="moodFlashText"></div>
+</div>
+
+<!-- ═══════ MAIN APP ═══════ -->
+<div id="app">
+
+  <!-- ═══════ CALENDAR TAB ═══════ -->
+  <div id="calendarTab" class="tab-content">
+    <div class="photo-banner">
+      <img id="calBannerImg" src="images/bg_mango.jpg" alt="Rahman">
+      <div class="overlay"></div>
+      <div class="banner-text">📅 RAHMAN'S CALENDAR <span id="calGreeting"></span></div>
+    </div>
+
+    <div class="glass-card slide-up">
+      <div class="cal-nav">
+        <button onclick="changeMonth(-1)">‹</button>
+        <div class="month-label" id="monthLabel"></div>
+        <button onclick="changeMonth(1)">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+
+    <div style="margin-top:16px;" class="slide-up slide-up-1">
+      <div class="voice-status" id="calVoiceStatus"></div>
+      <button class="voice-btn" id="calVoiceBtn" onclick="startVoice('calendar')">
+        <span class="pulse-ring"></span>
+        🎙️ Add Event by Voice
+      </button>
+    </div>
+
+    <button class="manual-add-toggle slide-up slide-up-2" onclick="toggleCalForm()">+ Add event manually</button>
+    <div id="calForm" class="add-form">
+      <input type="text" id="calEventTitle" class="form-input" placeholder="Event title">
+      <div class="form-row">
+        <input type="date" id="calEventDate" class="form-input">
+        <input type="time" id="calEventTime" class="form-input">
+      </div>
+      <div class="form-row">
+        <button class="form-btn" onclick="addCalEventManual()">Add Event</button>
+        <button class="form-btn cancel" onclick="toggleCalForm()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="selectedDateLabel" style="margin-top:16px; font-size:14px; font-weight:700; display:none;">
+      <span id="selectedDateText"></span>
+    </div>
+    <div id="eventList" class="event-list slide-up slide-up-3"></div>
+  </div>
+
+  <!-- ═══════ TODO TAB ═══════ -->
+  <div id="todoTab" class="tab-content hidden">
+    <div class="photo-banner">
+      <img id="todoBannerImg" src="images/bg_party.jpg" alt="Rahman">
+      <div class="overlay"></div>
+      <div class="banner-text">✅ RAHMAN'S TO DO LIST <span>Let's get it done 💪</span></div>
+    </div>
+
+    <div class="slide-up">
+      <div class="voice-status" id="todoVoiceStatus"></div>
+      <button class="voice-btn" id="todoVoiceBtn" onclick="startVoice('todo')">
+        <span class="pulse-ring"></span>
+        🎙️ Add Task by Voice
+      </button>
+    </div>
+
+    <button class="manual-add-toggle slide-up slide-up-1" onclick="toggleTodoForm()">+ Add task manually</button>
+    <div id="todoForm" class="add-form">
+      <input type="text" id="todoTitle" class="form-input" placeholder="Task title">
+      <div class="form-row">
+        <select id="todoPriority" class="form-select">
+          <option value="high">🔴 High</option>
+          <option value="medium" selected>🟡 Medium</option>
+          <option value="low">🟢 Low</option>
+        </select>
+      </div>
+      <textarea id="todoNotes" class="form-input" placeholder="Notes (optional)" rows="2" style="resize:none;"></textarea>
+      <div class="form-row">
+        <button class="form-btn" onclick="addTodoManual()">Add Task</button>
+        <button class="form-btn cancel" onclick="toggleTodoForm()">Cancel</button>
+      </div>
+    </div>
+
+    <div id="todoList" class="slide-up slide-up-2"></div>
+
+    <div class="completed-section slide-up slide-up-3">
+      <button class="completed-toggle" id="completedToggle" onclick="toggleCompleted()">
+        <span class="arrow" id="completedArrow">▶</span>
+        Completed (<span id="completedCount">0</span>)
+      </button>
+      <div id="completedList" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ MOOD TAB ═══════ -->
+  <div id="moodTab" class="tab-content hidden">
+    <div class="mood-container">
+      <div class="mood-title slide-up">
+        <span class="gradient-text">RAHMAN'S MOOD</span> 🎭
+      </div>
+      <div class="mood-subtitle slide-up slide-up-1">How are you feeling right now?</div>
+
+      <div class="mood-buttons slide-up slide-up-2">
+        <button class="mood-btn ass-btn" onclick="triggerMood('ass')">
+          <img src="images/mood_ass.jpg" alt="Ass mood">
+          <div class="mood-label">💀 ASS</div>
+        </button>
+        <button class="mood-btn fire-btn" onclick="triggerMood('fire')">
+          <img src="images/mood_fire.jpg" alt="Fire mood">
+          <div class="mood-label">🔥 FIRE</div>
+        </button>
+      </div>
+
+      <div class="mood-history glass-card slide-up slide-up-3">
+        <div class="mood-history-title">📊 Today's Mood Journey</div>
+        <div class="mood-history-list" id="moodHistoryList">
+          <span style="color:var(--text-muted); font-size:13px;">No moods logged yet today</span>
+        </div>
+      </div>
+
+      <div class="glass-card slide-up slide-up-4" style="width:100%;">
+        <div class="mood-history-title">🏆 Mood Stats</div>
+        <div id="moodStats" style="font-size:13px; color:var(--text-secondary);">
+          Start logging to see your stats!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ TAB BAR ═══════ -->
+  <nav id="tabBar">
+    <button class="tab-btn active" onclick="switchTab('calendar')" id="tabCalendar">
+      <span class="tab-icon">📅</span>
+      Calendar
+    </button>
+    <button class="tab-btn" onclick="switchTab('todo')" id="tabTodo">
+      <span class="tab-icon">✅</span>
+      To Do
+    </button>
+    <button class="tab-btn" onclick="switchTab('mood')" id="tabMood">
+      <span class="tab-icon">🎭</span>
+      Mood
+    </button>
+  </nav>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   STATE & STORAGE
+   ═══════════════════════════════════════════ */
+const STORAGE_KEYS = {
+  events: 'rahman_events',
+  todos: 'rahman_todos',
+  moods: 'rahman_moods',
+  apiKey: 'rahman_apikey',
+};
+
+function loadData(key, fallback = []) {
+  try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+  catch { return fallback; }
+}
+function saveData(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+// Legacy key slot kept for compatibility; backend now handles OpenAI calls
+const BAKED_API_KEY = '';
+
+let calEvents = loadData(STORAGE_KEYS.events);
+let todos = loadData(STORAGE_KEYS.todos);
+let moods = loadData(STORAGE_KEYS.moods);
+
+// Keep legacy key path inert; no frontend key required
+if (!localStorage.getItem(STORAGE_KEYS.apiKey) && BAKED_API_KEY) {
+  localStorage.setItem(STORAGE_KEYS.apiKey, BAKED_API_KEY);
+}
+
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let selectedDate = null;
+let mediaRecorder = null;
+let audioChunks = [];
+let currentVoiceContext = null;
+
+/* ═══════════════════════════════════════════
+   SPLASH & INIT
+   ═══════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  // Set greeting
+  const hour = new Date().getHours();
+  let greeting = hour < 12 ? 'Good morning, king 🌅' : hour < 17 ? 'Good afternoon, legend ☀️' : 'Good evening, boss 🌙';
+  document.getElementById('calGreeting').textContent = greeting;
+
+  // Set today's date for manual form
+  const today = new Date();
+  document.getElementById('calEventDate').value = today.toISOString().split('T')[0];
+
+  // Render
+  renderCalendar();
+  renderTodos();
+  renderMoodHistory();
+
+  // Splash — quick 1.2s then fade
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('fade-out');
+    document.getElementById('app').classList.add('visible');
+    setTimeout(() => {
+      document.getElementById('splash').style.display = 'none';
+    }, 500);
+  }, 1200);
+});
+
+/* ═══════════════════════════════════════════
+   TAB SWITCHING
+   ═══════════════════════════════════════════ */
+function switchTab(tab) {
+  const tabs = ['calendar', 'todo', 'mood'];
+  const tabIds = { calendar: 'calendarTab', todo: 'todoTab', mood: 'moodTab' };
+  const btnIds = { calendar: 'tabCalendar', todo: 'tabTodo', mood: 'tabMood' };
+
+  tabs.forEach(t => {
+    document.getElementById(tabIds[t]).classList.toggle('hidden', t !== tab);
+    document.getElementById(btnIds[t]).classList.toggle('active', t === tab);
+  });
+}
+
+/* ═══════════════════════════════════════════
+   CALENDAR
+   ═══════════════════════════════════════════ */
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  selectedDate = null;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('monthLabel').textContent = `${MONTH_NAMES[currentMonth]} ${currentYear}`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  // Day headers
+  DAY_NAMES.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-day-header';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  // Previous month days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other-month';
+    el.textContent = prevMonthDays - i;
+    grid.appendChild(el);
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    el.textContent = d;
+
+    if (dateStr === todayStr) el.classList.add('today');
+    if (dateStr === selectedDate) el.classList.add('selected');
+    if (calEvents.some(e => e.date === dateStr)) el.classList.add('has-events');
+
+    el.onclick = () => selectDate(dateStr);
+    grid.appendChild(el);
+  }
+
+  // Fill remaining
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let i = 1; i <= remaining; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day other-month';
+    el.textContent = i;
+    grid.appendChild(el);
+  }
+
+  renderEvents();
+}
+
+function selectDate(dateStr) {
+  selectedDate = dateStr;
+  renderCalendar();
+  renderEvents();
+}
+
+function renderEvents() {
+  const list = document.getElementById('eventList');
+  const label = document.getElementById('selectedDateLabel');
+  const labelText = document.getElementById('selectedDateText');
+
+  if (!selectedDate) {
+    // Show today's events
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    const todayEvents = calEvents.filter(e => e.date === todayStr).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+
+    if (todayEvents.length > 0) {
+      label.style.display = 'block';
+      labelText.textContent = "📌 Today's Events";
+      list.innerHTML = todayEvents.map(e => eventItemHTML(e)).join('');
+    } else {
+      label.style.display = 'none';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><p>Tap a date to view events, or use voice to add one!</p></div>';
+    }
+    return;
+  }
+
+  const dateEvents = calEvents.filter(e => e.date === selectedDate).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  const d = new Date(selectedDate + 'T00:00:00');
+  label.style.display = 'block';
+  labelText.textContent = `📌 ${d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+
+  if (dateEvents.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:20px; font-size:13px;">No events this day</div>';
+  } else {
+    list.innerHTML = dateEvents.map(e => eventItemHTML(e)).join('');
+  }
+}
+
+function eventItemHTML(e) {
+  const timeStr = e.time ? new Date(`2000-01-01T${e.time}`).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '—';
+  return `<div class="event-item">
+    <div class="event-time">${timeStr}</div>
+    <div class="event-title">${escapeHtml(e.title)}</div>
+    <button class="delete-btn" onclick="deleteEvent('${e.id}')">✕</button>
+  </div>`;
+}
+
+function addCalEventManual() {
+  const title = document.getElementById('calEventTitle').value.trim();
+  const date = document.getElementById('calEventDate').value;
+  const time = document.getElementById('calEventTime').value;
+
+  if (!title || !date) return;
+
+  calEvents.push({ id: genId(), title, date, time: time || '' });
+  saveData(STORAGE_KEYS.events, calEvents);
+
+  document.getElementById('calEventTitle').value = '';
+  document.getElementById('calEventTime').value = '';
+  toggleCalForm();
+
+  selectedDate = date;
+  renderCalendar();
+}
+
+function deleteEvent(id) {
+  calEvents = calEvents.filter(e => e.id !== id);
+  saveData(STORAGE_KEYS.events, calEvents);
+  renderCalendar();
+}
+
+function toggleCalForm() {
+  document.getElementById('calForm').classList.toggle('open');
+}
+
+/* ═══════════════════════════════════════════
+   TODO LIST
+   ═══════════════════════════════════════════ */
+function renderTodos() {
+  const activeTodos = todos.filter(t => !t.completed).sort((a,b) => {
+    const order = { high: 0, medium: 1, low: 2 };
+    return (order[a.priority] || 1) - (order[b.priority] || 1);
+  });
+  const completedTodos = todos.filter(t => t.completed).sort((a,b) => (b.completedAt||0) - (a.completedAt||0));
+
+  const todoList = document.getElementById('todoList');
+  if (activeTodos.length === 0) {
+    todoList.innerHTML = '<div class="empty-state"><div class="empty-icon">🎉</div><p>All caught up! Use voice or tap + to add a task.</p></div>';
+  } else {
+    todoList.innerHTML = activeTodos.map(t => todoItemHTML(t)).join('');
+  }
+
+  document.getElementById('completedCount').textContent = completedTodos.length;
+  document.getElementById('completedList').innerHTML = completedTodos.map(t => todoItemHTML(t)).join('');
+}
+
+function todoItemHTML(t) {
+  const cls = `todo-item priority-${t.priority} ${t.completed ? 'completed' : ''}`;
+  const check = t.completed ? '✓' : '';
+  return `<div class="${cls}" id="todo-${t.id}">
+    <button class="todo-check" onclick="toggleTodo('${t.id}')">${check}</button>
+    <div class="todo-info">
+      <div class="todo-title">${escapeHtml(t.title)}</div>
+      ${t.notes ? `<div class="todo-notes">${escapeHtml(t.notes)}</div>` : ''}
+      <div class="todo-meta">
+        <span class="priority-badge ${t.priority}">${t.priority}</span>
+        <span>${new Date(t.createdAt).toLocaleDateString()}</span>
+      </div>
+    </div>
+    <button class="todo-delete-btn" onclick="deleteTodo('${t.id}')">🗑️</button>
+  </div>`;
+}
+
+function addTodoManual() {
+  const title = document.getElementById('todoTitle').value.trim();
+  const priority = document.getElementById('todoPriority').value;
+  const notes = document.getElementById('todoNotes').value.trim();
+
+  if (!title) return;
+
+  todos.push({ id: genId(), title, priority, notes, completed: false, createdAt: Date.now() });
+  saveData(STORAGE_KEYS.todos, todos);
+
+  document.getElementById('todoTitle').value = '';
+  document.getElementById('todoNotes').value = '';
+  toggleTodoForm();
+  renderTodos();
+}
+
+function toggleTodo(id) {
+  const t = todos.find(t => t.id === id);
+  if (t) {
+    t.completed = !t.completed;
+    t.completedAt = t.completed ? Date.now() : null;
+    saveData(STORAGE_KEYS.todos, todos);
+    renderTodos();
+  }
+}
+
+function deleteTodo(id) {
+  todos = todos.filter(t => t.id !== id);
+  saveData(STORAGE_KEYS.todos, todos);
+  renderTodos();
+}
+
+function toggleTodoForm() {
+  document.getElementById('todoForm').classList.toggle('open');
+}
+
+function toggleCompleted() {
+  const list = document.getElementById('completedList');
+  const arrow = document.getElementById('completedArrow');
+  const isOpen = list.style.display !== 'none';
+  list.style.display = isOpen ? 'none' : 'block';
+  arrow.classList.toggle('open', !isOpen);
+}
+
+/* ═══════════════════════════════════════════
+   MOOD
+   ═══════════════════════════════════════════ */
+function triggerMood(type) {
+  // TTS
+  const utterance = new SpeechSynthesisUtterance(type);
+  utterance.rate = 0.9;
+  utterance.pitch = type === 'fire' ? 1.3 : 0.7;
+  utterance.volume = 1;
+  speechSynthesis.speak(utterance);
+
+  // Flash animation
+  const flash = document.getElementById('moodFlash');
+  const emoji = document.getElementById('moodFlashEmoji');
+  const text = document.getElementById('moodFlashText');
+
+  flash.className = `mood-flash ${type}-flash active`;
+  emoji.textContent = type === 'fire' ? '🔥' : '💀';
+  text.textContent = type.toUpperCase();
+
+  // Confetti
+  spawnConfetti(type === 'fire' ? ['#00e88f','#00d4ff','#4f8cff','#9b6dff'] : ['#ff4757','#ff4f9a','#ff8c42','#9b6dff']);
+
+  setTimeout(() => { flash.classList.remove('active'); }, 1200);
+
+  // Save mood
+  moods.push({ type, timestamp: Date.now() });
+  saveData(STORAGE_KEYS.moods, moods);
+  renderMoodHistory();
+}
+
+function spawnConfetti(colors) {
+  for (let i = 0; i < 30; i++) {
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    c.style.left = Math.random() * 100 + 'vw';
+    c.style.top = '-10px';
+    c.style.width = (6 + Math.random() * 8) + 'px';
+    c.style.height = (6 + Math.random() * 8) + 'px';
+    c.style.background = colors[Math.floor(Math.random() * colors.length)];
+    c.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    c.style.transform = `rotate(${Math.random()*360}deg)`;
+
+    const duration = 1 + Math.random() * 1.5;
+    const drift = -50 + Math.random() * 100;
+    c.animate([
+      { transform: `translateY(0) translateX(0) rotate(0deg)`, opacity: 1 },
+      { transform: `translateY(100vh) translateX(${drift}px) rotate(${360+Math.random()*360}deg)`, opacity: 0 }
+    ], { duration: duration * 1000, easing: 'cubic-bezier(.25,.46,.45,.94)' });
+
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), duration * 1000);
+  }
+}
+
+function renderMoodHistory() {
+  const today = new Date();
+  const todayStr = today.toDateString();
+  const todayMoods = moods.filter(m => new Date(m.timestamp).toDateString() === todayStr);
+
+  const list = document.getElementById('moodHistoryList');
+  if (todayMoods.length === 0) {
+    list.innerHTML = '<span style="color:var(--text-muted); font-size:13px;">No moods logged yet today</span>';
+  } else {
+    list.innerHTML = todayMoods.map(m =>
+      `<span class="mood-pip">${m.type === 'fire' ? '🔥' : '💀'}</span>`
+    ).join('');
+  }
+
+  // Stats
+  const totalFire = moods.filter(m => m.type === 'fire').length;
+  const totalAss = moods.filter(m => m.type === 'ass').length;
+  const total = totalFire + totalAss;
+  const stats = document.getElementById('moodStats');
+
+  if (total === 0) {
+    stats.innerHTML = 'Start logging to see your stats!';
+  } else {
+    const firePercent = Math.round((totalFire / total) * 100);
+    stats.innerHTML = `
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+        <span>🔥 Fire: <strong style="color:var(--accent-green)">${totalFire}</strong></span>
+        <span>💀 Ass: <strong style="color:var(--accent-red)">${totalAss}</strong></span>
+      </div>
+      <div style="height:8px; background:var(--bg-card); border-radius:4px; overflow:hidden;">
+        <div style="height:100%; width:${firePercent}%; background:linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); border-radius:4px; transition:width 0.5s;"></div>
+      </div>
+      <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--text-muted);">
+        ${firePercent >= 50 ? `${firePercent}% fire — looking good king 👑` : `${100-firePercent}% ass — you'll bounce back 💪`}
+      </div>
+    `;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   TRANSCRIPTION (Web Speech API)
+   ═══════════════════════════════════════════ */
+async function transcribeWithWebSpeech(audioBlob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      // Use the Web Speech API for transcription
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      // For Web Speech API, we need to use the SpeechRecognition API instead
+      // which works better on mobile/Android
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (!SpeechRecognition) {
+        reject(new Error('Speech recognition not supported on this device'));
+        return;
+      }
+
+      // Create a new instance for transcription
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      let transcript = '';
+
+      recognition.onstart = () => {
+        console.log('Transcription started');
+      };
+
+      recognition.onresult = (event) => {
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript + ' ';
+        }
+      };
+
+      recognition.onerror = (event) => {
+        reject(new Error(`Speech recognition error: ${event.error}`));
+      };
+
+      recognition.onend = () => {
+        resolve(transcript.trim());
+      };
+
+      // For blob transcription, we'd need to decode and play it back
+      // Instead, let's use a simpler approach: ask user to repeat with recognition active
+      // Actually, let's use Whisper via OpenAI API with proper error handling
+      decodeAudioAndTranscribe(audioBlob).then(resolve).catch(reject);
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Could not read audio file'));
+    };
+
+    reader.readAsArrayBuffer(audioBlob);
+  });
+}
+
+async function decodeAudioAndTranscribe(audioBlob) {
+  try {
+    // Convert blob to base64 for sending to backend
+    const base64 = await blobToBase64(audioBlob);
+
+    // Get backend URL from localStorage or use default
+    const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://rahmans-backend-jdg453kesa-uc.a.run.app';
+
+    // Call our backend to handle the transcription + parsing
+    const response = await fetch(`${backendUrl}/api/voice/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        audio: base64,
+        context: currentVoiceContext
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.error || `Backend error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.transcript || '';
+  } catch (err) {
+    console.error('Transcription error:', err);
+    throw err;
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      resolve(reader.result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/* ═══════════════════════════════════════════
+   VOICE RECORDING & AI
+   ═══════════════════════════════════════════ */
+async function startVoice(context) {
+  const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey);
+
+  currentVoiceContext = context;
+  const btn = document.getElementById(context === 'calendar' ? 'calVoiceBtn' : 'todoVoiceBtn');
+  const status = document.getElementById(context === 'calendar' ? 'calVoiceStatus' : 'todoVoiceStatus');
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    btn.classList.remove('recording');
+    btn.innerHTML = '<span class="pulse-ring"></span>🎙️ ' + (context === 'calendar' ? 'Add Event by Voice' : 'Add Task by Voice');
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      status.textContent = '✨ Processing your voice...';
+      status.className = 'voice-status processing';
+      await processVoice(blob, context);
+    };
+
+    mediaRecorder.start();
+    btn.classList.add('recording');
+    btn.innerHTML = '<span class="pulse-ring"></span>⏹️ Stop Recording';
+    status.textContent = '🎤 Listening...';
+    status.className = 'voice-status processing';
+  } catch (err) {
+    status.textContent = '❌ Microphone access denied';
+    status.className = 'voice-status error';
+    setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 3000);
+  }
+}
+
+async function processVoice(audioBlob, context) {
+  const status = document.getElementById(context === 'calendar' ? 'calVoiceStatus' : 'todoVoiceStatus');
+  const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://rahmans-backend-jdg453kesa-uc.a.run.app';
+
+  try {
+    // Convert audio to base64
+    const base64 = await blobToBase64(audioBlob);
+
+    status.textContent = '🔄 Sending to backend...';
+    status.className = 'voice-status processing';
+
+    // Call backend which handles transcription + parsing
+    const response = await fetch(`${backendUrl}/api/voice/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        audio: base64,
+        context: context
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `Backend error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    const text = result.transcript;
+    const parsed = result.parsed;
+
+    status.textContent = `📝 "${text}"`;
+
+    // Add items based on context
+    if (context === 'calendar' && parsed.events) {
+      parsed.events.forEach(e => {
+        calEvents.push({ id: genId(), title: e.title, date: e.date, time: e.time || '' });
+      });
+      saveData(STORAGE_KEYS.events, calEvents);
+      if (parsed.events.length > 0) selectedDate = parsed.events[0].date;
+      renderCalendar();
+      status.textContent = `✅ Added ${parsed.events.length} event(s)!`;
+      status.className = 'voice-status success';
+    } else if (context === 'todo' && parsed.tasks) {
+      parsed.tasks.forEach(t => {
+        todos.push({ id: genId(), title: t.title, priority: t.priority || 'medium', notes: t.notes || '', completed: false, createdAt: Date.now() });
+      });
+      saveData(STORAGE_KEYS.todos, todos);
+      renderTodos();
+      status.textContent = `✅ Added ${parsed.tasks.length} task(s)!`;
+      status.className = 'voice-status success';
+    }
+
+    setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 4000);
+
+  } catch (err) {
+    console.error('Voice processing error:', err);
+    status.textContent = `❌ ${err.message}`;
+    status.className = 'voice-status error';
+    setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 4000);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   API KEY
+   ═══════════════════════════════════════════ */
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) return;
+  localStorage.setItem(STORAGE_KEYS.apiKey, key);
+  document.getElementById('apiKeyModal').classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════ */
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ═══════════════════════════════════════════
+   ROTATING BANNERS
+   ═══════════════════════════════════════════ */
+const bannerImages = ['images/bg_mango.jpg','images/bg_formal.jpg','images/bg_dinner.jpg','images/bg_party.jpg','images/bg_friends1.jpg','images/bg_friends2.jpg'];
+let bannerIdx = 0;
+setInterval(() => {
+  bannerIdx = (bannerIdx + 1) % bannerImages.length;
+  const calImg = document.getElementById('calBannerImg');
+  const todoImg = document.getElementById('todoBannerImg');
+  calImg.style.opacity = '0';
+  todoImg.style.opacity = '0';
+  setTimeout(() => {
+    calImg.src = bannerImages[bannerIdx];
+    todoImg.src = bannerImages[(bannerIdx + 2) % bannerImages.length];
+    calImg.style.opacity = '1';
+    todoImg.style.opacity = '1';
+  }, 500);
+}, 8000);
+</script>
+
+</body>
+</html>
