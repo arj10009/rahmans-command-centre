@@ -10,6 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const TRANSCRIPTION_LANGUAGE = (process.env.TRANSCRIPTION_LANGUAGE || 'en').trim();
+const MIN_VOICE_BYTES = 512;
+const MIN_NOTE_VOICE_BYTES = 128;
 
 // Middleware
 app.use(cors());
@@ -43,7 +45,7 @@ app.post('/api/voice/process', async (req, res) => {
 
     // Decode base64 audio to buffer
     const audioBuffer = Buffer.from(audio, 'base64');
-    if (!audioBuffer.length || audioBuffer.length < 512) {
+    if (!audioBuffer.length || audioBuffer.length < MIN_VOICE_BYTES) {
       return res.status(400).json({
         error: 'No usable audio captured. Record for 1-2 seconds and try again.'
       });
@@ -113,9 +115,9 @@ app.post('/api/voice/transcribe', async (req, res) => {
     }
 
     const audioBuffer = Buffer.from(audio, 'base64');
-    if (!audioBuffer.length || audioBuffer.length < 512) {
+    if (!audioBuffer.length || audioBuffer.length < MIN_NOTE_VOICE_BYTES) {
       return res.status(400).json({
-        error: 'No usable audio captured. Record for 1-2 seconds and try again.'
+        error: 'Audio is too short. Try speaking for at least 1 second.'
       });
     }
 

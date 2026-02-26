@@ -898,6 +898,7 @@ let itemBeingEdited = null;
 let notesMediaRecorder = null;
 let notesAudioChunks = [];
 let notesActiveButtonId = null;
+const MIN_NOTE_VOICE_BYTES = 128;
 
 /* ═══════════════════════════════════════════
    SPLASH & INIT
@@ -1648,7 +1649,7 @@ async function toggleNotesVoice(targetInputId, buttonId) {
       notesAudioChunks = [];
       notesActiveButtonId = null;
 
-      if (!blob.size || blob.size < 512) {
+      if (!blob.size || blob.size < MIN_NOTE_VOICE_BYTES) {
         return flashNotesButton(buttonId, '❌ Too Short', 1800);
       }
 
