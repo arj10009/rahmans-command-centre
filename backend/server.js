@@ -62,6 +62,21 @@ app.post('/api/voice/process', async (req, res) => {
     console.log(`🤖 Parsing with GPT-4.1-mini (context: ${context})...`);
     const parsed = await parseWithGPT(transcript, context);
 
+    // Fallback for TODO extraction when model returns no tasks for usable speech
+    if (context === 'todo') {
+      if (!Array.isArray(parsed.tasks)) {
+        parsed.tasks = [];
+      }
+      if (parsed.tasks.length === 0) {
+        const fallbackTasks = fallbackTodoTasksFromTranscript(transcript);
+        if (fallbackTasks.length > 0) {
+          parsed.tasks = fallbackTasks;
+          console.log('🛟 Applied fallback task extraction');
+        }
+      }
+      console.log(`🧾 Parsed tasks count: ${parsed.tasks.length}`);
+    }
+
     console.log('✅ Processing complete');
     res.json({
       transcript,
@@ -150,7 +165,9 @@ Always return an array, even if empty.`;
 Extract tasks from user speech. Return ONLY valid JSON, no markdown, no code blocks:
 {"tasks": [{"title": "string", "priority": "high" or "medium" or "low", "notes": "string or empty"}]}
 Infer priority: "urgent", "ASAP", "important" = high. "whenever", "at some point" = low. Default = medium.
-Extract extra details as notes. Always return an array, even if empty.`;
+Extract extra details as notes.
+If transcript has at least one plausible actionable item, return at least one task.
+Only return an empty array for pure filler/greeting/noise (e.g. "oh", "um", "hello").`;
   }
 
   try {
@@ -188,6 +205,57 @@ Extract extra details as notes. Always return an array, even if empty.`;
     console.error('GPT API error:', error.response?.data || error.message);
     throw new Error(`Parsing failed: ${error.response?.data?.error?.message || error.message}`);
   }
+}
+
+function fallbackTodoTasksFromTranscript(transcript) {
+  if (!transcript) {
+    return [];
+  }
+
+  const cleaned = transcript
+    .replace(/[^\w\s'-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) {
+    return [];
+  }
+
+  const lowered = cleaned.toLowerCase();
+  const fillerOnly = new Set(['oh', 'uh', 'um', 'hmm', 'huh', 'hello', 'hi', 'hey', 'test']);
+  if (fillerOnly.has(lowered)) {
+    return [];
+  }
+
+  let title = cleaned
+    .replace(/^(add|create|set|make|new)\s+(a\s+)?(task|todo)\s*/i, '')
+    .replace(/^(todo|to do)\s*/i, '')
+    .replace(/^(remind me to|i need to|need to)\s*/i, '')
+    .trim();
+
+  if (!title) {
+    title = cleaned;
+  }
+
+  const words = title.split(/\s+/).filter(Boolean);
+  if (words.length === 0) {
+    return [];
+  }
+
+  // Avoid creating useless single-token noise tasks.
+  if (words.length === 1 && words[0].length < 4) {
+    return [];
+  }
+
+  if (title.length > 120) {
+    title = `${title.slice(0, 117).trim()}...`;
+  }
+
+  return [{
+    title: title.charAt(0).toUpperCase() + title.slice(1),
+    priority: 'medium',
+    notes: ''
+  }];
 }
 
 // 404 handler

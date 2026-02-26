@@ -1374,14 +1374,23 @@ async function processVoice(audioBlob, context, recordedMimeType) {
       renderCalendar();
       status.textContent = `✅ Added ${parsed.events.length} event(s)!`;
       status.className = 'voice-status success';
-    } else if (context === 'todo' && parsed.tasks) {
-      parsed.tasks.forEach(t => {
-        todos.push({ id: genId(), title: t.title, priority: t.priority || 'medium', notes: t.notes || '', completed: false, createdAt: Date.now() });
-      });
-      saveData(STORAGE_KEYS.todos, todos);
-      renderTodos();
-      status.textContent = `✅ Added ${parsed.tasks.length} task(s)!`;
-      status.className = 'voice-status success';
+    } else if (context === 'todo') {
+      const extractedTasks = Array.isArray(parsed.tasks)
+        ? parsed.tasks.filter(t => t && typeof t.title === 'string' && t.title.trim().length > 0)
+        : [];
+
+      if (extractedTasks.length === 0) {
+        status.textContent = `⚠️ Heard "${text}" but couldn't extract a task. Try: "Add task buy milk".`;
+        status.className = 'voice-status error';
+      } else {
+        extractedTasks.forEach(t => {
+          todos.push({ id: genId(), title: t.title.trim(), priority: t.priority || 'medium', notes: t.notes || '', completed: false, createdAt: Date.now() });
+        });
+        saveData(STORAGE_KEYS.todos, todos);
+        renderTodos();
+        status.textContent = `✅ Added ${extractedTasks.length} task(s)!`;
+        status.className = 'voice-status success';
+      }
     }
 
     setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 4000);
