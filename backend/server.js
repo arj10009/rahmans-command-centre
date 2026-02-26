@@ -9,6 +9,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const TRANSCRIPTION_LANGUAGE = (process.env.TRANSCRIPTION_LANGUAGE || 'en').trim();
 
 // Middleware
 app.use(cors());
@@ -50,7 +51,9 @@ app.post('/api/voice/process', async (req, res) => {
 
     // Step 1: Transcribe audio using Whisper
     console.log(`🎤 Transcribing audio... mime=${mimeType || 'unknown'} bytes=${audioBuffer.length} clientBytes=${byteLength || 'n/a'}`);
-    const transcript = await transcribeAudio(audioBuffer, mimeType);
+    const transcript = await transcribeAudio(audioBuffer, mimeType, {
+      prompt: 'Transcribe clear spoken English for a personal productivity app. Names may include Rahman and Arjun.'
+    });
 
     if (!transcript || transcript.trim().length === 0) {
       return res.status(400).json({ error: 'Could not transcribe audio' });
@@ -117,7 +120,9 @@ app.post('/api/voice/transcribe', async (req, res) => {
     }
 
     console.log(`🎙️ Notes transcription... mime=${mimeType || 'unknown'} bytes=${audioBuffer.length} clientBytes=${byteLength || 'n/a'}`);
-    const transcript = await transcribeAudio(audioBuffer, mimeType);
+    const transcript = await transcribeAudio(audioBuffer, mimeType, {
+      prompt: 'Transcribe spoken English note text accurately. Prefer English words only.'
+    });
 
     if (!transcript || transcript.trim().length === 0) {
       return res.status(400).json({ error: 'Could not transcribe audio' });
@@ -136,12 +141,22 @@ app.post('/api/voice/transcribe', async (req, res) => {
 /**
  * Transcribe audio using OpenAI Whisper API
  */
-async function transcribeAudio(audioBuffer, rawMimeType) {
+async function transcribeAudio(audioBuffer, rawMimeType, options = {}) {
   try {
     const { filename, contentType } = getAudioFileMeta(rawMimeType);
+    const language = options.language || TRANSCRIPTION_LANGUAGE;
+    const prompt = options.prompt || '';
+
     const form = new FormData();
     form.append('file', audioBuffer, { filename, contentType });
     form.append('model', 'whisper-1');
+    if (language) {
+      form.append('language', language);
+    }
+    if (prompt) {
+      form.append('prompt', prompt);
+    }
+    form.append('temperature', '0');
 
     const response = await axios.post(
       'https://api.openai.com/v1/audio/transcriptions',

@@ -1662,6 +1662,10 @@ async function toggleNotesVoice(targetInputId, buttonId) {
           flashNotesButton(buttonId, '❌ No Speech', 1800);
           return;
         }
+        if (hasStrongNonLatinScript(transcript)) {
+          flashNotesButton(buttonId, '⚠️ Retry In English', 2200);
+          return;
+        }
         appendTextToField(targetInputId, transcript);
         flashNotesButton(buttonId, '✅ Added', 1400);
       } catch (err) {
@@ -1697,6 +1701,16 @@ function appendTextToField(inputId, text) {
   const nextText = text.trim();
   if (!nextText) return;
   input.value = current ? `${current}${/[.!?]$/.test(current) ? ' ' : '. '}${nextText}` : nextText;
+}
+
+function hasStrongNonLatinScript(text) {
+  if (!text) return false;
+  const compact = text.replace(/\s+/g, '');
+  if (!compact) return false;
+
+  const nonLatinMatches = compact.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u0D7F\u0E00-\u0E7F\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/g) || [];
+  if (nonLatinMatches.length < 3) return false;
+  return (nonLatinMatches.length / compact.length) > 0.25;
 }
 
 async function transcribeAudioOnly(audioBlob, recordedMimeType) {
