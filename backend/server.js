@@ -94,6 +94,46 @@ app.post('/api/voice/process', async (req, res) => {
 });
 
 /**
+ * POST /api/voice/transcribe
+ * Transcribes raw audio and returns plain text only
+ */
+app.post('/api/voice/transcribe', async (req, res) => {
+  try {
+    const { audio, mimeType, byteLength } = req.body;
+
+    if (!audio) {
+      return res.status(400).json({ error: 'Missing audio' });
+    }
+
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'API key not configured' });
+    }
+
+    const audioBuffer = Buffer.from(audio, 'base64');
+    if (!audioBuffer.length || audioBuffer.length < 512) {
+      return res.status(400).json({
+        error: 'No usable audio captured. Record for 1-2 seconds and try again.'
+      });
+    }
+
+    console.log(`🎙️ Notes transcription... mime=${mimeType || 'unknown'} bytes=${audioBuffer.length} clientBytes=${byteLength || 'n/a'}`);
+    const transcript = await transcribeAudio(audioBuffer, mimeType);
+
+    if (!transcript || transcript.trim().length === 0) {
+      return res.status(400).json({ error: 'Could not transcribe audio' });
+    }
+
+    res.json({ transcript });
+  } catch (error) {
+    console.error('❌ Notes transcription error:', error.message);
+    res.status(500).json({
+      error: error.message || 'Transcription failed',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+/**
  * Transcribe audio using OpenAI Whisper API
  */
 async function transcribeAudio(audioBuffer, rawMimeType) {
@@ -156,9 +196,10 @@ async function parseWithGPT(transcript, context) {
   if (context === 'calendar') {
     systemPrompt = `You are a calendar assistant for Rahman. Today is ${dayName}, ${todayStr}.
 Extract calendar events from user speech. Return ONLY valid JSON, no markdown, no code blocks:
-{"events": [{"title": "string", "date": "YYYY-MM-DD", "time": "HH:MM" or null}]}
+{"events": [{"title": "string", "date": "YYYY-MM-DD", "time": "HH:MM" or null, "notes": "string or empty"}]}
 If user says "tomorrow", "next Monday", etc., calculate the correct date.
 If no specific time mentioned, set time to null.
+Put extra context in notes.
 Always return an array, even if empty.`;
   } else {
     systemPrompt = `You are a to-do list assistant for Rahman.

@@ -262,7 +262,14 @@ html, body {
   font-size: 11px; font-weight: 600; color: var(--accent-cyan);
   min-width: 50px;
 }
-.event-item .event-title { font-size: 14px; font-weight: 600; flex: 1; }
+.event-item .event-info { flex: 1; min-width: 0; }
+.event-item .event-title { font-size: 14px; font-weight: 600; }
+.event-item .event-notes {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
 .event-actions {
   display: flex; align-items: center; gap: 4px;
 }
@@ -548,6 +555,29 @@ html, body {
 }
 .form-btn:hover { background: var(--accent-purple); }
 .form-btn.cancel { background: var(--bg-hover); color: var(--text-secondary); }
+.note-input-group {
+  display: flex; flex-direction: column; gap: 8px;
+}
+.note-voice-btn {
+  align-self: flex-end;
+  border: 1px solid rgba(79,140,255,0.25);
+  background: rgba(79,140,255,0.08);
+  color: var(--accent-cyan);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.note-voice-btn.recording {
+  border-color: rgba(255,71,87,0.5);
+  background: rgba(255,71,87,0.15);
+  color: var(--accent-red);
+}
+.note-voice-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
 .manual-add-toggle {
   background: none; border: 1px dashed rgba(79,140,255,0.3);
   border-radius: var(--radius-sm); color: var(--text-muted);
@@ -643,6 +673,10 @@ html, body {
         <input type="date" id="editEventDate" class="form-input">
         <input type="time" id="editEventTime" class="form-input">
       </div>
+      <div class="note-input-group">
+        <textarea id="editEventNotes" class="form-input" placeholder="Notes (optional)" rows="3" style="resize:none;"></textarea>
+        <button type="button" id="editEventNotesVoiceBtn" class="note-voice-btn" onclick="toggleNotesVoice('editEventNotes', 'editEventNotesVoiceBtn')">🎙️ Voice Note</button>
+      </div>
     </div>
 
     <div id="editTodoFields" style="display:none;">
@@ -654,7 +688,10 @@ html, body {
           <option value="low">🟢 Low</option>
         </select>
       </div>
-      <textarea id="editTodoNotes" class="form-input" placeholder="Notes (optional)" rows="3" style="resize:none;"></textarea>
+      <div class="note-input-group">
+        <textarea id="editTodoNotes" class="form-input" placeholder="Notes (optional)" rows="3" style="resize:none;"></textarea>
+        <button type="button" id="editTodoNotesVoiceBtn" class="note-voice-btn" onclick="toggleNotesVoice('editTodoNotes', 'editTodoNotesVoiceBtn')">🎙️ Voice Note</button>
+      </div>
     </div>
 
     <div class="form-row" style="margin-top:12px;">
@@ -705,6 +742,10 @@ html, body {
         <input type="date" id="calEventDate" class="form-input">
         <input type="time" id="calEventTime" class="form-input">
       </div>
+      <div class="note-input-group">
+        <textarea id="calEventNotes" class="form-input" placeholder="Notes (optional)" rows="2" style="resize:none;"></textarea>
+        <button type="button" id="calEventNotesVoiceBtn" class="note-voice-btn" onclick="toggleNotesVoice('calEventNotes', 'calEventNotesVoiceBtn')">🎙️ Voice Note</button>
+      </div>
       <div class="form-row">
         <button class="form-btn" onclick="addCalEventManual()">Add Event</button>
         <button class="form-btn cancel" onclick="toggleCalForm()">Cancel</button>
@@ -743,7 +784,10 @@ html, body {
           <option value="low">🟢 Low</option>
         </select>
       </div>
-      <textarea id="todoNotes" class="form-input" placeholder="Notes (optional)" rows="2" style="resize:none;"></textarea>
+      <div class="note-input-group">
+        <textarea id="todoNotes" class="form-input" placeholder="Notes (optional)" rows="2" style="resize:none;"></textarea>
+        <button type="button" id="todoNotesVoiceBtn" class="note-voice-btn" onclick="toggleNotesVoice('todoNotes', 'todoNotesVoiceBtn')">🎙️ Voice Note</button>
+      </div>
       <div class="form-row">
         <button class="form-btn" onclick="addTodoManual()">Add Task</button>
         <button class="form-btn cancel" onclick="toggleTodoForm()">Cancel</button>
@@ -851,6 +895,9 @@ let mediaRecorder = null;
 let audioChunks = [];
 let currentVoiceContext = null;
 let itemBeingEdited = null;
+let notesMediaRecorder = null;
+let notesAudioChunks = [];
+let notesActiveButtonId = null;
 
 /* ═══════════════════════════════════════════
    SPLASH & INIT
@@ -1017,7 +1064,10 @@ function eventItemHTML(e) {
   const timeStr = e.time ? new Date(`2000-01-01T${e.time}`).toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'}) : '—';
   return `<div class="event-item">
     <div class="event-time">${timeStr}</div>
-    <div class="event-title">${escapeHtml(e.title)}</div>
+    <div class="event-info">
+      <div class="event-title">${escapeHtml(e.title)}</div>
+      ${e.notes ? `<div class="event-notes">${escapeHtml(e.notes)}</div>` : ''}
+    </div>
     <div class="event-actions">
       <button class="event-action-btn" onclick="openEventEditor('${e.id}')" title="Edit event">✏️</button>
       <button class="delete-btn" onclick="deleteEvent('${e.id}')" title="Delete event">✕</button>
@@ -1029,14 +1079,16 @@ function addCalEventManual() {
   const title = document.getElementById('calEventTitle').value.trim();
   const date = document.getElementById('calEventDate').value;
   const time = document.getElementById('calEventTime').value;
+  const notes = document.getElementById('calEventNotes').value.trim();
 
   if (!title || !date) return;
 
-  calEvents.push({ id: genId(), title, date, time: time || '' });
+  calEvents.push({ id: genId(), title, date, time: time || '', notes });
   saveData(STORAGE_KEYS.events, calEvents);
 
   document.getElementById('calEventTitle').value = '';
   document.getElementById('calEventTime').value = '';
+  document.getElementById('calEventNotes').value = '';
   toggleCalForm();
 
   selectedDate = date;
@@ -1151,6 +1203,7 @@ function openEventEditor(id) {
   document.getElementById('editEventTitle').value = eventItem.title || '';
   document.getElementById('editEventDate').value = eventItem.date || '';
   document.getElementById('editEventTime').value = eventItem.time || '';
+  document.getElementById('editEventNotes').value = eventItem.notes || '';
   document.getElementById('itemEditModal').classList.add('open');
   document.getElementById('editEventTitle').focus();
 }
@@ -1187,11 +1240,13 @@ function saveItemEdit() {
     const title = document.getElementById('editEventTitle').value.trim();
     const date = document.getElementById('editEventDate').value;
     const time = document.getElementById('editEventTime').value;
+    const notes = document.getElementById('editEventNotes').value.trim();
     if (!title || !date) return;
 
     eventItem.title = title;
     eventItem.date = date;
     eventItem.time = time || '';
+    eventItem.notes = notes;
     saveData(STORAGE_KEYS.events, calEvents);
     selectedDate = date;
     renderCalendar();
@@ -1508,7 +1563,7 @@ async function processVoice(audioBlob, context, recordedMimeType) {
     // Add items based on context
     if (context === 'calendar' && parsed.events) {
       parsed.events.forEach(e => {
-        calEvents.push({ id: genId(), title: e.title, date: e.date, time: e.time || '' });
+        calEvents.push({ id: genId(), title: e.title, date: e.date, time: e.time || '', notes: (e.notes || '').trim() });
       });
       saveData(STORAGE_KEYS.events, calEvents);
       if (parsed.events.length > 0) selectedDate = parsed.events[0].date;
@@ -1556,6 +1611,117 @@ function saveApiKey() {
   if (!key) return;
   localStorage.setItem(STORAGE_KEYS.apiKey, key);
   document.getElementById('apiKeyModal').classList.remove('open');
+}
+
+async function toggleNotesVoice(targetInputId, buttonId) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+
+  if (notesMediaRecorder && notesMediaRecorder.state === 'recording') {
+    if (notesActiveButtonId === buttonId) {
+      notesMediaRecorder.stop();
+    }
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const preferredMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg'];
+    const recorderMimeType = preferredMimeTypes.find(type => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+
+    notesAudioChunks = [];
+    notesActiveButtonId = buttonId;
+    notesMediaRecorder = recorderMimeType
+      ? new MediaRecorder(stream, { mimeType: recorderMimeType })
+      : new MediaRecorder(stream);
+
+    btn.textContent = '⏹️ Stop';
+    btn.classList.add('recording');
+
+    notesMediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) notesAudioChunks.push(e.data); };
+    notesMediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+
+      const outputMimeType = notesMediaRecorder.mimeType || recorderMimeType || 'audio/webm';
+      const blob = new Blob(notesAudioChunks, { type: outputMimeType });
+      notesMediaRecorder = null;
+      notesAudioChunks = [];
+      notesActiveButtonId = null;
+
+      if (!blob.size || blob.size < 512) {
+        return flashNotesButton(buttonId, '❌ Too Short', 1800);
+      }
+
+      btn.disabled = true;
+      btn.classList.remove('recording');
+      btn.textContent = '⏳ Transcribing...';
+
+      try {
+        const transcript = await transcribeAudioOnly(blob, outputMimeType);
+        if (!transcript) {
+          flashNotesButton(buttonId, '❌ No Speech', 1800);
+          return;
+        }
+        appendTextToField(targetInputId, transcript);
+        flashNotesButton(buttonId, '✅ Added', 1400);
+      } catch (err) {
+        console.error('Notes voice error:', err);
+        flashNotesButton(buttonId, '❌ Error', 2000);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    notesMediaRecorder.start(250);
+  } catch (err) {
+    console.error('Notes voice permission error:', err);
+    flashNotesButton(buttonId, '❌ Mic Blocked', 2000);
+  }
+}
+
+function flashNotesButton(buttonId, text, durationMs = 1500) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.classList.remove('recording');
+  btn.textContent = text;
+  setTimeout(() => {
+    btn.textContent = '🎙️ Voice Note';
+    btn.disabled = false;
+  }, durationMs);
+}
+
+function appendTextToField(inputId, text) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const current = input.value.trim();
+  const nextText = text.trim();
+  if (!nextText) return;
+  input.value = current ? `${current}${/[.!?]$/.test(current) ? ' ' : '. '}${nextText}` : nextText;
+}
+
+async function transcribeAudioOnly(audioBlob, recordedMimeType) {
+  const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://rahmans-backend-jdg453kesa-uc.a.run.app';
+  const base64 = await blobToBase64(audioBlob);
+
+  const response = await fetch(`${backendUrl}/api/voice/transcribe`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      audio: base64,
+      mimeType: recordedMimeType || audioBlob.type || 'audio/webm',
+      byteLength: audioBlob.size
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown transcription error' }));
+    throw new Error(error.error || `Transcription error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.transcript || '';
 }
 
 /* ═══════════════════════════════════════════
