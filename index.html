@@ -1277,8 +1277,6 @@ function blobToBase64(blob) {
    VOICE RECORDING & AI
    ═══════════════════════════════════════════ */
 async function startVoice(context) {
-  const apiKey = localStorage.getItem(STORAGE_KEYS.apiKey);
-
   currentVoiceContext = context;
   const btn = document.getElementById(context === 'calendar' ? 'calVoiceBtn' : 'todoVoiceBtn');
   const status = document.getElementById(context === 'calendar' ? 'calVoiceStatus' : 'todoVoiceStatus');
@@ -1292,19 +1290,33 @@ async function startVoice(context) {
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const preferredMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/ogg'];
+    const recorderMimeType = preferredMimeTypes.find(type => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+
     audioChunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    mediaRecorder = recorderMimeType
+      ? new MediaRecorder(stream, { mimeType: recorderMimeType })
+      : new MediaRecorder(stream);
 
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
     mediaRecorder.onstop = async () => {
       stream.getTracks().forEach(t => t.stop());
-      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const outputMimeType = mediaRecorder.mimeType || recorderMimeType || 'audio/webm';
+      const blob = new Blob(audioChunks, { type: outputMimeType });
+
+      if (!blob.size || blob.size < 512) {
+        status.textContent = '❌ No audio captured. Hold recording for 1-2 seconds and try again.';
+        status.className = 'voice-status error';
+        setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 4000);
+        return;
+      }
+
       status.textContent = '✨ Processing your voice...';
       status.className = 'voice-status processing';
-      await processVoice(blob, context);
+      await processVoice(blob, context, outputMimeType);
     };
 
-    mediaRecorder.start();
+    mediaRecorder.start(250);
     btn.classList.add('recording');
     btn.innerHTML = '<span class="pulse-ring"></span>⏹️ Stop Recording';
     status.textContent = '🎤 Listening...';
@@ -1316,7 +1328,7 @@ async function startVoice(context) {
   }
 }
 
-async function processVoice(audioBlob, context) {
+async function processVoice(audioBlob, context, recordedMimeType) {
   const status = document.getElementById(context === 'calendar' ? 'calVoiceStatus' : 'todoVoiceStatus');
   const backendUrl = localStorage.getItem('BACKEND_URL') || 'https://rahmans-backend-jdg453kesa-uc.a.run.app';
 
@@ -1335,7 +1347,9 @@ async function processVoice(audioBlob, context) {
       },
       body: JSON.stringify({
         audio: base64,
-        context: context
+        context: context,
+        mimeType: recordedMimeType || audioBlob.type || 'audio/webm',
+        byteLength: audioBlob.size
       })
     });
 
@@ -1374,7 +1388,11 @@ async function processVoice(audioBlob, context) {
 
   } catch (err) {
     console.error('Voice processing error:', err);
-    status.textContent = `❌ ${err.message}`;
+    if ((err.message || '').toLowerCase().includes('could not be decoded')) {
+      status.textContent = '❌ Audio format issue. Try a 2-3 second recording and speak clearly.';
+    } else {
+      status.textContent = `❌ ${err.message}`;
+    }
     status.className = 'voice-status error';
     setTimeout(() => { status.textContent = ''; status.className = 'voice-status'; }, 4000);
   }

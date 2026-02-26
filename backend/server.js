@@ -3,8 +3,6 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const axios = require('axios');
 const FormData = require('form-data');
-const fs = require('fs');
-const path = require('path');
 
 dotenv.config();
 
@@ -32,7 +30,7 @@ app.get('/health', (req, res) => {
  */
 app.post('/api/voice/process', async (req, res) => {
   try {
-    const { audio, context } = req.body;
+    const { audio, context, mimeType, byteLength } = req.body;
 
     if (!audio || !context) {
       return res.status(400).json({ error: 'Missing audio or context' });
@@ -44,10 +42,15 @@ app.post('/api/voice/process', async (req, res) => {
 
     // Decode base64 audio to buffer
     const audioBuffer = Buffer.from(audio, 'base64');
+    if (!audioBuffer.length || audioBuffer.length < 512) {
+      return res.status(400).json({
+        error: 'No usable audio captured. Record for 1-2 seconds and try again.'
+      });
+    }
 
     // Step 1: Transcribe audio using Whisper
-    console.log('🎤 Transcribing audio...');
-    const transcript = await transcribeAudio(audioBuffer);
+    console.log(`🎤 Transcribing audio... mime=${mimeType || 'unknown'} bytes=${audioBuffer.length} clientBytes=${byteLength || 'n/a'}`);
+    const transcript = await transcribeAudio(audioBuffer, mimeType);
 
     if (!transcript || transcript.trim().length === 0) {
       return res.status(400).json({ error: 'Could not transcribe audio' });
@@ -78,10 +81,11 @@ app.post('/api/voice/process', async (req, res) => {
 /**
  * Transcribe audio using OpenAI Whisper API
  */
-async function transcribeAudio(audioBuffer) {
+async function transcribeAudio(audioBuffer, rawMimeType) {
   try {
+    const { filename, contentType } = getAudioFileMeta(rawMimeType);
     const form = new FormData();
-    form.append('file', audioBuffer, 'audio.webm');
+    form.append('file', audioBuffer, { filename, contentType });
     form.append('model', 'whisper-1');
 
     const response = await axios.post(
@@ -101,6 +105,27 @@ async function transcribeAudio(audioBuffer) {
     console.error('Whisper API error:', error.response?.data || error.message);
     throw new Error(`Transcription failed: ${error.response?.data?.error?.message || error.message}`);
   }
+}
+
+function getAudioFileMeta(rawMimeType) {
+  const normalized = (rawMimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+  const extensionByMimeType = {
+    'audio/webm': 'webm',
+    'audio/mp4': 'mp4',
+    'audio/x-m4a': 'm4a',
+    'audio/m4a': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/ogg': 'ogg'
+  };
+
+  const extension = extensionByMimeType[normalized] || 'webm';
+  return {
+    filename: `audio.${extension}`,
+    contentType: normalized || 'audio/webm'
+  };
 }
 
 /**
