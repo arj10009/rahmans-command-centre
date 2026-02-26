@@ -263,11 +263,20 @@ html, body {
   min-width: 50px;
 }
 .event-item .event-title { font-size: 14px; font-weight: 600; flex: 1; }
+.event-actions {
+  display: flex; align-items: center; gap: 4px;
+}
+.event-item .event-action-btn,
 .event-item .delete-btn {
   background: none; border: none; color: var(--accent-red);
   font-size: 16px; cursor: pointer; padding: 4px 8px;
   opacity: 0.6; transition: opacity 0.2s;
 }
+.event-item .event-action-btn {
+  color: var(--accent-cyan);
+  font-size: 14px;
+}
+.event-item .event-action-btn:hover,
 .event-item .delete-btn:hover { opacity: 1; }
 
 /* ═══════════════════════════════════════════
@@ -320,12 +329,18 @@ html, body {
 .priority-badge.high { background: rgba(255,71,87,0.15); color: var(--accent-red); }
 .priority-badge.medium { background: rgba(255,140,66,0.15); color: var(--accent-orange); }
 .priority-badge.low { background: rgba(0,232,143,0.15); color: var(--accent-green); }
+.todo-actions {
+  display: flex; flex-direction: column; gap: 4px;
+  align-self: flex-start; margin-top: 2px;
+}
+.todo-action-btn,
 .todo-delete-btn {
   background: none; border: none; color: var(--accent-red);
   font-size: 14px; cursor: pointer; padding: 4px 8px;
   opacity: 0.5; transition: opacity 0.2s;
-  align-self: flex-start; margin-top: 2px;
 }
+.todo-action-btn { color: var(--accent-cyan); }
+.todo-action-btn:hover,
 .todo-delete-btn:hover { opacity: 1; }
 
 .completed-section {
@@ -616,6 +631,39 @@ html, body {
   </div>
 </div>
 
+<!-- ═══════ EDIT ITEM MODAL ═══════ -->
+<div id="itemEditModal" class="modal-overlay">
+  <div class="modal-box">
+    <h2 id="itemEditTitle">Edit Item</h2>
+    <p id="itemEditSubtitle">Update details and save your changes.</p>
+
+    <div id="editEventFields" style="display:none;">
+      <input type="text" id="editEventTitle" class="form-input" placeholder="Event title">
+      <div class="form-row">
+        <input type="date" id="editEventDate" class="form-input">
+        <input type="time" id="editEventTime" class="form-input">
+      </div>
+    </div>
+
+    <div id="editTodoFields" style="display:none;">
+      <input type="text" id="editTodoTitle" class="form-input" placeholder="Task title">
+      <div class="form-row">
+        <select id="editTodoPriority" class="form-select">
+          <option value="high">🔴 High</option>
+          <option value="medium">🟡 Medium</option>
+          <option value="low">🟢 Low</option>
+        </select>
+      </div>
+      <textarea id="editTodoNotes" class="form-input" placeholder="Notes (optional)" rows="3" style="resize:none;"></textarea>
+    </div>
+
+    <div class="form-row" style="margin-top:12px;">
+      <button class="form-btn" onclick="saveItemEdit()">Save Changes</button>
+      <button class="form-btn cancel" onclick="closeItemEditModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════ MOOD FLASH OVERLAY ═══════ -->
 <div id="moodFlash" class="mood-flash">
   <div class="big-emoji" id="moodFlashEmoji"></div>
@@ -802,6 +850,7 @@ let selectedDate = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let currentVoiceContext = null;
+let itemBeingEdited = null;
 
 /* ═══════════════════════════════════════════
    SPLASH & INIT
@@ -820,6 +869,14 @@ window.addEventListener('DOMContentLoaded', () => {
   renderCalendar();
   renderTodos();
   renderMoodHistory();
+
+  // Modal close interactions
+  document.getElementById('itemEditModal').addEventListener('click', (evt) => {
+    if (evt.target.id === 'itemEditModal') closeItemEditModal();
+  });
+  document.addEventListener('keydown', (evt) => {
+    if (evt.key === 'Escape') closeItemEditModal();
+  });
 
   // Splash — quick 1.2s then fade
   setTimeout(() => {
@@ -961,7 +1018,10 @@ function eventItemHTML(e) {
   return `<div class="event-item">
     <div class="event-time">${timeStr}</div>
     <div class="event-title">${escapeHtml(e.title)}</div>
-    <button class="delete-btn" onclick="deleteEvent('${e.id}')">✕</button>
+    <div class="event-actions">
+      <button class="event-action-btn" onclick="openEventEditor('${e.id}')" title="Edit event">✏️</button>
+      <button class="delete-btn" onclick="deleteEvent('${e.id}')" title="Delete event">✕</button>
+    </div>
   </div>`;
 }
 
@@ -1027,7 +1087,10 @@ function todoItemHTML(t) {
         <span>${new Date(t.createdAt).toLocaleDateString()}</span>
       </div>
     </div>
-    <button class="todo-delete-btn" onclick="deleteTodo('${t.id}')">🗑️</button>
+    <div class="todo-actions">
+      <button class="todo-action-btn" onclick="openTodoEditor('${t.id}')" title="Edit task">✏️</button>
+      <button class="todo-delete-btn" onclick="deleteTodo('${t.id}')" title="Delete task">🗑️</button>
+    </div>
   </div>`;
 }
 
@@ -1073,6 +1136,84 @@ function toggleCompleted() {
   const isOpen = list.style.display !== 'none';
   list.style.display = isOpen ? 'none' : 'block';
   arrow.classList.toggle('open', !isOpen);
+}
+
+function openEventEditor(id) {
+  const eventItem = calEvents.find(e => e.id === id);
+  if (!eventItem) return;
+
+  itemBeingEdited = { type: 'event', id };
+  document.getElementById('itemEditTitle').textContent = 'Edit Event';
+  document.getElementById('itemEditSubtitle').textContent = 'Update title, date, or time.';
+  document.getElementById('editEventFields').style.display = 'block';
+  document.getElementById('editTodoFields').style.display = 'none';
+
+  document.getElementById('editEventTitle').value = eventItem.title || '';
+  document.getElementById('editEventDate').value = eventItem.date || '';
+  document.getElementById('editEventTime').value = eventItem.time || '';
+  document.getElementById('itemEditModal').classList.add('open');
+  document.getElementById('editEventTitle').focus();
+}
+
+function openTodoEditor(id) {
+  const task = todos.find(t => t.id === id);
+  if (!task) return;
+
+  itemBeingEdited = { type: 'todo', id };
+  document.getElementById('itemEditTitle').textContent = 'Edit Task';
+  document.getElementById('itemEditSubtitle').textContent = 'Adjust task details and priority.';
+  document.getElementById('editEventFields').style.display = 'none';
+  document.getElementById('editTodoFields').style.display = 'block';
+
+  document.getElementById('editTodoTitle').value = task.title || '';
+  document.getElementById('editTodoPriority').value = task.priority || 'medium';
+  document.getElementById('editTodoNotes').value = task.notes || '';
+  document.getElementById('itemEditModal').classList.add('open');
+  document.getElementById('editTodoTitle').focus();
+}
+
+function closeItemEditModal() {
+  document.getElementById('itemEditModal').classList.remove('open');
+  itemBeingEdited = null;
+}
+
+function saveItemEdit() {
+  if (!itemBeingEdited) return;
+
+  if (itemBeingEdited.type === 'event') {
+    const eventItem = calEvents.find(e => e.id === itemBeingEdited.id);
+    if (!eventItem) return closeItemEditModal();
+
+    const title = document.getElementById('editEventTitle').value.trim();
+    const date = document.getElementById('editEventDate').value;
+    const time = document.getElementById('editEventTime').value;
+    if (!title || !date) return;
+
+    eventItem.title = title;
+    eventItem.date = date;
+    eventItem.time = time || '';
+    saveData(STORAGE_KEYS.events, calEvents);
+    selectedDate = date;
+    renderCalendar();
+    return closeItemEditModal();
+  }
+
+  if (itemBeingEdited.type === 'todo') {
+    const task = todos.find(t => t.id === itemBeingEdited.id);
+    if (!task) return closeItemEditModal();
+
+    const title = document.getElementById('editTodoTitle').value.trim();
+    const priority = document.getElementById('editTodoPriority').value;
+    const notes = document.getElementById('editTodoNotes').value.trim();
+    if (!title) return;
+
+    task.title = title;
+    task.priority = priority;
+    task.notes = notes;
+    saveData(STORAGE_KEYS.todos, todos);
+    renderTodos();
+    return closeItemEditModal();
+  }
 }
 
 /* ═══════════════════════════════════════════
