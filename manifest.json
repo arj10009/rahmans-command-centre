@@ -2,7 +2,7 @@
   "name": "Rahman's Command Centre",
   "short_name": "Rahman",
   "description": "Built with love, just for Rahman ✨",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0e1a",
   "theme_color": "#0a0e1a",
